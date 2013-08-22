@@ -1,13 +1,46 @@
 (function() {
-	var linhas = [{ nome: "felipe", konra: 1 }, { djasd: 1, konra: 22}];
-	var texteArea = $('#textId');
+	var linhas = [{ nome: "felipe", konra: 1 }, { nome: 'konrad', konra: 22 }, { nome: 'json' }];
+	var input = $('#inputLinhas');
+	var form = $('form');
+	var tabela = $('#tabela');
+	var btn = $('#submitButton');
+	var mynTable = tabela.nTable(linhas);
+	var ok = true;
 	
+	input.val(JSON.stringify(linhas)).
+	bind('keyup', function() {
+		var val = input.val();
+		try {
+			linhas = JSON.parse(val);
+			btn.removeClass('btn-danger');			
+			btn.addClass('btn-success');
+			ok = true;
+		} catch (ex) {
+			btn.removeClass('btn-success');
+			btn.addClass('btn-danger');
+			ok = false;
+		}
+	});
 
-	tabela = $('#tabela');
-	animate = $('#tabelaAnimate');
 
-	nTable = tabela.nTable(linhas);
+	/*$('button').click(function() {
+		generateNTable(texteArea.val());
+	})*/
 
+	form.submit(function() {
+		if (ok)
+			generateNTable();
+		else 
+			alert('JSON está errado =(');
+		return false;
+	});
+
+	function generateNTable(lines){
+		if (mynTable)
+			mynTable.refresh(linhas);
+		else
+			mynTable = tabela.nTable(linhas);
+	}
 })()
 
 function mediaPonderada(notas) {

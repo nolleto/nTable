@@ -9,31 +9,71 @@
 
 	var nTable = function($this) {
 
+		var self = this;
+
 		var settings = {
 			animated: true,
 			animationDuration: 250
 		};
-		var self = this;
+		
+		var table = {
+			lines: [],
+			columns: [],
+			newLines: [],
+			deletedLines: []
+		}
 
 		//Prototype ------------------------------------------------------------------------------------------------------------------------------------------------
 		self.create = function(lines) {
-			var columns = generateColumns(lines);
+			if (lines) {
+				setLines(lines);
+				setColumnsByLines(table.lines);
+			}
 
-			var table = createTable($this);
-			createThead(table, columns);
-			createTbody(table, lines, columns);
+			createTable(createTableHtml(), createTheadHtml(), createTbodyHtml());
 		}
 
 		self.refresh = function(lines) {
-			$this.fadeOut(function() {
-				self.create(lines);
-				$this.fadeIn(animationDuration());
-			}, animationDuration())
-			
+			self.create(lines);
+		}
+
+		self.animar = function() {
+			animateRows();
 		}
 
 		self.setSettings = function(set) {
 			$.extend(settings, set);
+		}
+
+		function createTable(tableHtml, theadHtml, tbodyHtml) {
+			function append() {
+				$this.append(tableHtml)
+				.find('table').
+				append(theadHtml).
+				append(tbodyHtml);
+			}
+
+			if (isTableCreated()){
+				if (isAnimated()) {
+					$this.fadeOut(animationDuration(), function() {
+						removeTable();
+						append();
+						$this.fadeIn(animationDuration());
+					});
+				} else {
+					removeTable();
+					append();
+				}
+			} else {
+				if (isAnimated()) {
+					$this.fadeOut(0);
+					append();
+					$this.fadeIn(animationDuration());
+				} else {
+					append();	
+				}
+			}
+			
 		}
 
 		//Verifications ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -41,34 +81,44 @@
 			return settings.animated;
 		}
 
+		function isTableCreated() {
+			return ($this.find('table').length > 0 ? true : false);
+		}
+
 		function animationDuration() {
 			return settings.animationDuration;
 		}
 
-		//Gerar HTML ------------------------------------------------------------------------------------------------------------------------------------------------
-		function createTable(place) {
-			place.find('table').remove();
+		//Remover ------------------------------------------------------------------------------------------------------------------------------------------------
+		function removeTable() {
+			$this.find('table').remove();
+		}
 
+		function removeThead(table) {
+			table.find('thead').remove();
+		}
+
+		function removeTbody(table) {
+			table.find('tbody').remove();
+		}
+
+		//Gerar HTML ------------------------------------------------------------------------------------------------------------------------------------------------
+		function createTableHtml() {
 			var data = {};
 			var transform = [{
 				tag: 'table',
 				class: 'table table-bordered table-condensed'
 			}];
 
-			var table = json2html.transform(data, transform);
-			place.append(table);
-
-			return place.find('table');
+			return json2html.transform(data, transform);
 		}
 
-		function createThead(table, columns) {
-			table.find('thead').remove();
-
+		function createTheadHtml() {
 			var data = {};
 			var subTranform = [];
 
-			for (var i = 0; i < columns.length; i++) {
-				var column = columns[i];
+			for (var i = 0; i < table.columns.length; i++) {
+				var column = table.columns[i];
 
 				data['name' + i] = capitaliseFirstLetter(column['name']);
 				subTranform.push({
@@ -85,34 +135,29 @@
 				}]
 			}];
 
-			var thead = json2html.transform(data, transform);
-			table.prepend(thead);
+			return json2html.transform(data, transform);
 		}
 
-		function createTbody(table, lines, columns) {
-			table.find('tbody').remove();
-
+		function createTbodyHtml() {
 			var dataTr = [];
 			var subTransformTr = [];
 
-			var data = {};
-			var transform = [{
-				tag: 'tbody'
-			}];
-
-			for (var i = 0; i < lines.length; i++) {
-				var line = lines[i];
+			for (var i = 0; i < table.lines.length; i++) {
+				var line = table.lines[i];
 
 				dataTr.push({});
 				
-				for (var j = 0; j < columns.length; j++) {
-					var column = columns[j];
+				for (var j = 0; j < table.columns.length; j++) {
+					var column = table.columns[j];
 
 					dataTr[i]['name' + j] = line[column['name']];
-					if (subTransformTr.length < columns.length) {
+					if (subTransformTr.length < table.columns.length) {
 						subTransformTr.push({
-							tag: 'td',
-							html: '${name' + j + '}'
+							tag: 'td',							
+							children: [{
+								tag: 'div',
+								html: '${name' + j + '}'
+							}]
 						});
 					}
 				}
@@ -121,21 +166,26 @@
 				tag: 'tr',
 				children: subTransformTr
 			}]
-			
-			var tbody = json2html.transform(data, transform);
+				
 			var tr = json2html.transform(dataTr, transformTr);
 
-			table.append(tbody).find('tbody').append(tr);
+			var data = [{
+				tr: tr
+			}];
+			var transform = [{
+				tag: 'tbody',
+				html: '${tr}'
+			}];
+
+			return json2html.transform(data, transform);
 		}
 
-		//Funcoes ------------------------------------------------------------------------------------------------------------------------------------------------
+		//Linas e Colunas ------------------------------------------------------------------------------------------------------------------------------------------------
 		function generateColumns(lines) {
 			var columns = [];
 			var propts = [];
-			if (!lines)
-				return columns;
-			
-			var checkProptExist = function(propt) {
+
+			function checkProptExist(propt) {
 				for (var i = 0; i < propts.length; i++) {
 					if (propts[i] == propt)
 						return true;
@@ -160,6 +210,67 @@
 			return columns;
 		}
 
+		function setLines(lines) {
+			table.lines = treatLinesOrColumns(lines);
+		}
+
+		function setColumnsByLines(lines) {
+			setColumns(generateColumns(lines));
+		}
+
+		function setColumns(columns) {
+			table.columns = treatLinesOrColumns(columns);
+		}
+
+		function treatLinesOrColumns(lines) {
+			if (!lines || typeof lines !== "object")
+				return [];
+			if (!lines.length)
+				lines = [lines];
+			return lines;
+		}
+
+		function checkNewLines(lines) {
+			table.newLines = [];
+			table.deletedLines = [];
+			for (var i = 0; i < lines.length; i++) {
+				var nLine = lines[i];
+				var isNew = true;
+
+				for (var j = 0; j < table.lines.length; j++) {
+					var oLine = table.lines[j];
+
+					if (JSON.stringify(nLine) == JSON.stringify(oLine)) {
+						isNew = false;
+						break;
+					}
+				}
+			if(isNew)
+				table.newLines.push(i);
+
+			}
+			console.log(table.newLines);
+		}
+
+		function animateRows() {
+			var trs = $this.find('tr');
+			for (var i = 0; i < table.newLines.length; i++) {
+				var tr = $(trs[table.newLines[i] + 1]);
+				var div = tr.find('div');
+				div.css('height', 'initial');
+				var finalHeight = div.height();
+
+				console.log(finalHeight)
+				tr.addClass('trHeight');
+				div.animate({ height: finalHeight }, 500, function() {					
+					tr.removeClass('trHeight');
+					div.css('height', 'initial');					
+				});
+			}
+			return false;
+		}
+
+		//Funcoes ------------------------------------------------------------------------------------------------------------------------------------------------
 		function capitaliseFirstLetter(string) {
 		    return string.charAt(0).toUpperCase() + string.slice(1);
 		}
