@@ -1,10 +1,10 @@
 (function() {
-	var linhas = [{ nome: "felipe", konra: 1 }, { nome: 'konrad', konra: 22 }, { nome: 'json' }];
+	var linhas = [{ nome: "felipe", idade: 1 }, { nome: 'konrad', idade: 22 }, { nome: 'json', idade: 5000 }];
 	var input = $('#inputLinhas');
 	var form = $('form');
 	var tabela = $('#tabela');
 	var btn = $('#submitButton');
-	var mynTable = tabela.nTable(linhas);
+	 mynTable = tabela.nTable(linhas);
 	var ok = true;
 	
 	input.val(JSON.stringify(linhas)).
@@ -23,9 +23,9 @@
 	});
 
 
-	/*$('button').click(function() {
-		generateNTable(texteArea.val());
-	})*/
+	$('#animarButton').click(function() {
+		mynTable.animar(1);
+	})
 
 	form.submit(function() {
 		if (ok)

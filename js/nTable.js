@@ -13,7 +13,7 @@
 
 		var settings = {
 			animated: true,
-			animationDuration: 250
+			animationDuration: 500
 		};
 		
 		var table = {
@@ -22,6 +22,8 @@
 			newLines: [],
 			deletedLines: []
 		}
+
+		var get = {};
 
 		//Prototype ------------------------------------------------------------------------------------------------------------------------------------------------
 		self.create = function(lines) {
@@ -37,43 +39,38 @@
 			self.create(lines);
 		}
 
-		self.animar = function() {
-			animateRows();
-		}
-
 		self.setSettings = function(set) {
 			$.extend(settings, set);
 		}
 
+		//Create ------------------------------------------------------------------------------------------------------------------------------------------------
 		function createTable(tableHtml, theadHtml, tbodyHtml) {
 			function append() {
 				$this.append(tableHtml)
 				.find('table').
 				append(theadHtml).
 				append(tbodyHtml);
+				getPadding();
 			}
 
-			if (isTableCreated()){
-				if (isAnimated()) {
-					$this.fadeOut(animationDuration(), function() {
+			if (isAnimated()) {
+				if (isTableCreated()) {
+					collapseAll(undefined, function() {
 						removeTable();
 						append();
-						$this.fadeIn(animationDuration());
+						collapseAll(0);
+						expandAll();
 					});
 				} else {
 					removeTable();
 					append();
+					collapseAll(0);
+					expandAll();
 				}
 			} else {
-				if (isAnimated()) {
-					$this.fadeOut(0);
-					append();
-					$this.fadeIn(animationDuration());
-				} else {
-					append();	
-				}
-			}
-			
+				removeTable();
+				append();
+			}			
 		}
 
 		//Verifications ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -87,6 +84,34 @@
 
 		function animationDuration() {
 			return settings.animationDuration;
+		}
+
+		//Gets ------------------------------------------------------------------------------------------------------------------------------------------------
+		function checkGet(propt) {
+			return get[propt];
+		}
+
+		function getPadding() {
+			var attr = checkGet('padding');
+			if (attr)
+				return attr;
+
+			var tds = $this.find('td')
+			if (!tds)
+				return false;
+			var td = $(tds[0]);
+			var padding = td.css('padding');
+			setPadding(padding);
+			return getPadding();
+		}
+
+		//Sets ------------------------------------------------------------------------------------------------------------------------------------------------
+		function setPropt(propt, value) {
+			get[propt] = value;
+		}
+
+		function setPadding(value) {
+			setPropt('padding', value);
 		}
 
 		//Remover ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -123,7 +148,10 @@
 				data['name' + i] = capitaliseFirstLetter(column['name']);
 				subTranform.push({
 					tag: 'th',
-					html: '${name' + i + '}'
+					children: [{
+						tag: 'div',
+						html: '${name' + i + '}'
+					}]
 				});
 			}
 
@@ -211,6 +239,7 @@
 		}
 
 		function setLines(lines) {
+			checkNewLines(lines);
 			table.lines = treatLinesOrColumns(lines);
 		}
 
@@ -252,22 +281,117 @@
 			console.log(table.newLines);
 		}
 
-		function animateRows() {
-			var trs = $this.find('tr');
-			for (var i = 0; i < table.newLines.length; i++) {
-				var tr = $(trs[table.newLines[i] + 1]);
-				var div = tr.find('div');
-				div.css('height', 'initial');
-				var finalHeight = div.height();
+		//Animações  ------------------------------------------------------------------------------------------------------------------------------------------------
+		function collapse(tr, duration, callback) {
+			if (!duration && duration != 0)
+				duration = animationDuration();
+			var td = tr.find('td');
+			var divs = tr.find('div');
+			if (td.length < 1)
+				td = tr.find('th');
+			divs.css('overflow', 'hidden');
 
-				console.log(finalHeight)
-				tr.addClass('trHeight');
-				div.animate({ height: finalHeight }, 500, function() {					
-					tr.removeClass('trHeight');
-					div.css('height', 'initial');					
-				});
+			divs.animate({ height: 0 }, duration);
+			td.animate({ padding: 0 }, duration);
+			tr.animate({ height: 0 }, duration, callback);
+		}
+
+		function expand(tr, duration, callback) {
+			if (!duration && duration != 0)
+				duration = animationDuration();
+			var td = tr.find('td');
+			if (td.length < 1)
+				td = tr.find('th');
+			var divs = tr.find('div');
+			divs.css('overflow', 'hidden')
+
+			tr.css('height', 'initial');
+			divs.css('height', 'initial');
+			var finalHeight = tr.innerHeight();
+			var finalHeightD = divs.innerHeight();
+			var padding = getPadding();
+
+        	divs.css('height', 0);
+			td.css('padding', 0);
+
+			divs.animate({ height: finalHeightD }, duration);
+			td.animate({ padding: padding }, duration, callback);
+			tr.animate({ height: finalHeight }, duration, function() {
+				tr.removeAttr('style');
+				td.removeAttr('style');
+				divs.removeAttr('style');
+			});
+		}
+
+		function collapseHeader(duration, callback) {
+			var header = $($this.find('tr')[0]);	
+			aaaa = header;		
+			collapse(header, duration, callback);
+		}
+
+		function expandHeader(duration, callback) {
+			var header = $($this.find('tr')[0]);
+			expand(header, duration, callback);
+		}
+
+		function collapseRow(index) {
+			index++;
+			var trs = $this.find('tr');
+			for (var i = 0; i < trs.length; i++) {
+				if (i == index) {
+					var tr = $(trs[i]);
+					collapse(tr);
+				}
 			}
-			return false;
+		}
+
+		function expandRow(index) {
+			index++;
+			var trs = $this.find('tr');
+			for (var i = 0; i < trs.length; i++) {
+				if (i == index) {
+					var tr = $(trs[i]);
+					expand(tr);
+				}
+			}
+		}
+
+		function collapseAllRows(duration, callback) {
+			var sendedCallBack = false;
+			var trs = $this.find('tr');
+			for (var i = 1; i < trs.length; i++) {
+				var tr = $(trs[i]);
+				if (!sendedCallBack) {
+					sendedCallBack = true;
+					collapse(tr, duration, callback);
+				} else {
+					collapse(tr, duration);
+				}
+			}	
+		}
+
+		function expandAllRows(duration, callback) {
+			var sendedCallBack = false;
+			var trs = $this.find('tr');
+			for (var i = 1; i < trs.length; i++) {			
+				var tr = $(trs[i]);
+				if (!sendedCallBack) {
+					sendedCallBack = true;
+					expand(tr, duration, callback);
+				} else {
+					expand(tr, duration);
+				}
+			}
+		}
+
+		function collapseAll(duration, callback) {
+			collapseHeader(duration, callback);
+			collapseAllRows(duration);
+		}
+
+		function expandAll(duration, callback) {
+			expandHeader(duration, callback);
+			expandAllRows(duration);
 		}
 
 		//Funcoes ------------------------------------------------------------------------------------------------------------------------------------------------
